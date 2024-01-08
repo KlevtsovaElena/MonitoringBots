@@ -11,15 +11,6 @@ services:
     ports: 
       - 8090:80
 
-  php:
-    build: 
-      context: .
-      dockerfile: Dockerfile-php
-    volumes:
-      - ./../frontend/:/var/www
-    ports:
-      - 9010:9000
-
   mysql:
     build:
       context: .
