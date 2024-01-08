@@ -20,7 +20,7 @@
 }
 .bot_content{
     width: 18%;
-    height: 650px;
+    max-height: calc(100vh - 95px);
     background-color: #181818;
     margin: 5px;
 }

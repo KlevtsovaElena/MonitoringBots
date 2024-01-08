@@ -20,16 +20,6 @@ services:
     ports:
       - 9010:9000
 
-
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile-backend
-    volumes:
-      - ./../backend/:/app/
-    ports:
-      - 8080:8091
-
   mysql:
     build:
       context: .
@@ -49,6 +39,16 @@ services:
     ports:
       - 9000:8080
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile-backend
+    volumes:
+      - ./../backend/:/app/
+    ports:
+      - 8080:8091
+    restart: always
+
   api:
     build:
       context: .
@@ -57,4 +57,4 @@ services:
       - ./../api/:/app/
     ports:
       - 8081:80
-
+    restart: always

@@ -4,9 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -39,16 +38,6 @@ type ResponseT struct {
 	} `json:"result"`
 }
 
-// type UserT struct {
-// 	ID         int
-// 	Username   string
-// 	FirstName  string
-// 	LastName   string
-// 	Messages   []MessageT
-// 	ReqDate    int
-// 	LastVisite int
-// }
-
 type UserT struct {
 	ID        int
 	Username  string
@@ -57,32 +46,21 @@ type UserT struct {
 	ReqDate   int
 }
 
-// func (u *UserT) addMessage(text string, messageTime int) {
-
-// 	message := MessageT{}
-// 	message.Content = text
-// 	message.Date = messageTime
-// 	u.Messages = append(u.Messages, message)
-
-// }
-
-func (m *MessageT) addMessage(text string, messageTime int, chatId int) {
-
-	m.UserID = chatId
-	m.Content = text
-	m.Date = messageTime
-
-}
-
 type MessageT struct {
 	UserID  int
 	Content string
 	Date    int
 }
 
+func (m *MessageT) addMessage(text string, messageTime int, chatId int) {
+	m.UserID = chatId
+	m.Content = text
+	m.Date = messageTime
+}
+
 var host string = "https://api.telegram.org/bot"
 
-var tokens = [5]string{
+var tokens = []string{
 	"6131123688:AAGV7bDvX4aX4_n-ShaiKjXlpUvlnfXsQFY",
 	"6266036859:AAGLaQvcjIR8BgkymXNwP0rSfqx2lzQvdmA",
 	"6114246715:AAHeEIQBYooYdGG-Dgjqv0jLxPH6zxGJRNY",
@@ -90,9 +68,9 @@ var tokens = [5]string{
 	"6025286750:AAHWYyfw1g4-QCP6iopsR5xkMprILA3vdkI",
 }
 
-var lastMessage = [5]int{0, 0, 0, 0, 0}
+var lastMessage = []int{0, 0, 0, 0, 0}
 
-var importansWord = [9]string{
+var importansWord = []string{
 	"срочно",
 	"помогите",
 	"помощь",
@@ -115,37 +93,33 @@ var Db, Err = sql.Open("mysql", "root:nordic123@tcp(mysql:3306)/inordic")
 
 func main() {
 
+	// проверка подключились ли к БД
 	if Err != nil {
 		fmt.Println("НЕ подключились к БД", Err)
 	}
 
-	//получили юзеров из ДБ в оперативную память
+	//получили юзеров из базы в оперативную память
 	rows, err := Db.Query("select * from `users`")
-
 	if err != nil {
-		fmt.Println("Что-то не так с rows", err)
+		fmt.Println("Не удалось получить юзеров", err)
 	}
 
+	// запишем юзеров в оперативку
 	for rows.Next() {
 		u := UserT{}
 		err := rows.Scan(&u.ID, &u.Username, &u.FirstName, &u.LastName, &u.ReqDate)
 		if err != nil {
-			fmt.Println("ошибка в users rows", err)
+			fmt.Println("ошибка при считывании юзера в u", err)
 			continue
 		}
 		UsersDB[u.ID] = u
 	}
-
-	//считываем из бд при включении
-	// dataDb, _ := ioutil.ReadFile("db.json")
-	// json.Unmarshal(dataDb, &UsersDB)
-	// fmt.Println(dataDb)
+	fmt.Println(UsersDB)
 
 	for range time.Tick(time.Second * 1) {
 		//отправляем запрос к Telegram API на получение сообщений длЯ каждого бота
 		for j := 0; j < len(tokens); j++ {
 			handleBot(j)
-
 		}
 	}
 
@@ -158,8 +132,6 @@ func sendMessage(chatId int, text string, token string) {
 
 // функция проверки на важные слова
 func checkImportant(text string) bool {
-
-	// проверка сообщений на важные слова
 	for i := 0; i < len(importansWord); i++ {
 		if strings.Contains(strings.ToLower(text), importansWord[i]) {
 			return true
@@ -172,15 +144,15 @@ func checkImportant(text string) bool {
 func handleBot(j int) {
 
 	var url string = host + tokens[j] + "/getUpdates?offset=" + strconv.Itoa(lastMessage[j])
-
+	// отправляем запрос на url, получим новые сообщения бота
 	response, err := http.Get(url)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Ошибка отправки запроса на апи телеги", err)
 	}
+	// считываем тело запроса (получаем Json в виде среза байт)
+	data, _ := io.ReadAll(response.Body)
 
-	data, _ := ioutil.ReadAll(response.Body)
-
-	//парсим данные из json
+	//парсим данные из json в структуру
 	var responseObj ResponseT
 	json.Unmarshal(data, &responseObj)
 
@@ -192,9 +164,9 @@ func handleBot(j int) {
 		return
 	}
 
-	fmt.Println("сообщения из ", tokens[j])
+	fmt.Println("сообщения из ", tokens[j], "всего", number)
 
-	//в цикле доставать инормацию по каждому сообщению
+	//в цикле достанем инормацию по каждому сообщению
 	for i := 0; i < number; i++ {
 
 		text := responseObj.Result[i].Message.Text
@@ -204,51 +176,31 @@ func handleBot(j int) {
 		firstName := responseObj.Result[i].Message.From.FirstName
 		lastName := responseObj.Result[i].Message.From.LastName
 
-		//определяем зарегистрирован ли пользователь, бд
-		// exists := db.QueryRow("select count(id) from `users` where id=?", chatId)
-		// if err != nil {
-		// 	fmt.Println("Что-то не так с rows", err)
-		// }
-
-		// fmt.Println(chatId, " ", exists)
-
-		// var exist int
-		// exists.Scan(&exist)
-
-		// fmt.Println(chatId, " ", exist)
 		//определяем зарегистрирован ли пользователь
 		_, exist := UsersDB[chatId]
 
+		// если не зарегистрирован
 		if exist == false {
+			// собираем инфу по юзеру
 			user := UserT{}
 			user.ID = chatId
 			user.Username = username
 			user.FirstName = firstName
 			user.LastName = lastName
-			// user.LastVisite = messageTime
 			user.ReqDate = messageTime
-			// user.addMessage(text, messageTime)
 
 			//если не зарегистрирован - добавляем в БД и сохраняем в ОП
-			_, err := Db.Query("INSERT INTO `users`(`id`,`username`,`first_name`,`last_name`, `date_req`) VALUES(?,?, ?, ?,?)", chatId, username, firstName, lastName, messageTime)
+			_, err := Db.Query("INSERT INTO `users`(`id`,`username`,`first_name`,`last_name`, `date_req`) VALUES(?,?, ?, ?,?)",
+				chatId, username, firstName, lastName, messageTime)
 			if err != nil {
 				fmt.Println("Ошибка сохранения пользователя ", err)
 			} else {
 				fmt.Println("пользователь добавлен")
 			}
 
+			// записываем в оперативку
 			UsersDB[chatId] = user
-
 		}
-		//else {
-
-		//MessagesDB[chatId] = addMessage(text, messageTime)
-		// 	user, _ := UsersDB[chatId]
-		// 	// user.LastVisite = messageTime
-		// 	// user.addMessage(text, messageTime)
-
-		// 	UsersDB[chatId] = user
-		//}
 
 		//проверим сообщение на пустоту
 		if text == "" {
@@ -261,41 +213,21 @@ func handleBot(j int) {
 			is_important = 1
 		}
 
-		//запись сообщений с БД и оперативку
-		_, err := Db.Query("INSERT INTO `messages`(`user_id`,`content`,`c_time`, `bot_id`, `is_important`) VALUES(?,?, ?,?,?)", chatId, text, messageTime, j+1, is_important)
+		//запись сообщений в БД
+		_, err := Db.Query("INSERT INTO `messages`(`user_id`,`content`,`c_time`, `bot_id`, `is_important`) VALUES(?,?, ?,?,?)",
+			chatId, text, messageTime, j+1, is_important)
 		if err != nil {
 			fmt.Println("Ошибка сохранения сообщения ", err)
 		} else {
 			fmt.Println("сообщение " + text + " добавлено")
 		}
 
-		//запишем сообщения в ОП
-		message := MessageT{}
-		message.addMessage(text, messageTime, chatId)
-		MessagesDB = append(MessagesDB, message)
-
-		//сохраняем в файл
-		file, _ := os.Create("dbUsers.json")
-		jsonUsers, _ := json.Marshal(UsersDB)
-		file.Write(jsonUsers)
-		file.Close()
-		file2, _ := os.Create("dbMessages.json")
-		jsonMessages, _ := json.Marshal(MessagesDB)
-		file2.Write(jsonMessages)
-		file2.Close()
-		// file3, err := os.Create("http://localhost:8080/dbUsers.json")
-		// if err != nil {
-		// 	fmt.Println("Ошибка создания файла ", err)
-		// }
-
-		// file3.Write(jsonMessages)
-		// file3.Close()
 		//отвечаем пользователю на его сообщение
 		go sendMessage(chatId, text, tokens[j])
 
 	}
 
-	//запоминаем update_id  последнего сообщения
+	//запоминаем update_id  последнего сообщения для бота
 	lastMessage[j] = responseObj.Result[number-1].UpdateID + 1
 	fmt.Println(MessagesDB)
 }
