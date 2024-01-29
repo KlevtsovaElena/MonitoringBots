@@ -63,7 +63,7 @@ func main() {
 	ApiBots := ApiBotsT{}
 
 	//подключение к БД
-	db, err := sql.Open("mysql", "root:nordic123@tcp(mysql:3306)/inordic")
+	db, err := sql.Open("mysql", "root:admin@tcp(mysql:3306)/messages")
 	if err != nil {
 		fmt.Println("НЕ подключились к БД", err)
 	}

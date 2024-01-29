@@ -89,7 +89,7 @@ var MessagesDB = []MessageT{}
 var UsersDB = make(map[int]UserT)
 
 // создаем соединение с БД
-var Db, Err = sql.Open("mysql", "root:nordic123@tcp(mysql:3306)/inordic")
+var Db, Err = sql.Open("mysql", "root:admin@tcp(mysql:3306)/messages")
 
 func main() {
 
